@@ -145,3 +145,23 @@ ARCH=arm64
 MEMORY_SIZE=256
 TIMEOUT=10
 ```
+
+### CD из GitHub Actions в Lambda
+
+Файл: `.github/workflows/deploy-lambda.yml`.
+
+Триггеры:
+- `push` в `main`,
+- `workflow_dispatch` (ручной запуск).
+
+Что делает workflow:
+1. Запускает `make ci`.
+2. Получает AWS credentials через OIDC (`aws-actions/configure-aws-credentials`).
+3. Выполняет деплой в режиме `DEPLOY_MODE=update-only`.
+4. Дергает smoke checks через Function URL.
+
+Используемая IAM роль для OIDC:
+- `arn:aws:iam::729665432048:role/github-actions-cicd-deploy-role`
+
+Если нужно изменить целевой Lambda function:
+- поменяй `FUNCTION_NAME` в `.github/workflows/deploy-lambda.yml`.

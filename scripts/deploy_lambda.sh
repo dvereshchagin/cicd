@@ -8,13 +8,20 @@ ZIP_PATH="${BUILD_DIR}/function.zip"
 TRUST_POLICY_PATH="${BUILD_DIR}/trust-policy.json"
 
 AWS_REGION="${AWS_REGION:-eu-north-1}"
-AWS_PROFILE="${AWS_PROFILE:-terraform_login}"
+AWS_PROFILE="${AWS_PROFILE:-}"
 FUNCTION_NAME="${FUNCTION_NAME:-cicd-microservice}"
 ROLE_NAME="${ROLE_NAME:-${FUNCTION_NAME}-exec-role}"
+ROLE_ARN="${ROLE_ARN:-}"
 RUNTIME="${RUNTIME:-provided.al2023}"
 ARCH="${ARCH:-arm64}"
 MEMORY_SIZE="${MEMORY_SIZE:-256}"
 TIMEOUT="${TIMEOUT:-10}"
+DEPLOY_MODE="${DEPLOY_MODE:-full}"
+
+if [[ "${DEPLOY_MODE}" != "full" && "${DEPLOY_MODE}" != "update-only" ]]; then
+  echo "DEPLOY_MODE must be 'full' or 'update-only'"
+  exit 1
+fi
 
 if ! command -v aws >/dev/null 2>&1; then
   echo "aws CLI is not installed"
@@ -32,15 +39,22 @@ if [[ -n "${AWS_PROFILE}" ]]; then
 fi
 
 echo "Using AWS region: ${AWS_REGION}"
-echo "Using AWS profile: ${AWS_PROFILE}"
+if [[ -n "${AWS_PROFILE}" ]]; then
+  echo "Using AWS profile: ${AWS_PROFILE}"
+else
+  echo "Using AWS profile: default credential chain"
+fi
+echo "Deploy mode: ${DEPLOY_MODE}"
 echo "Function name: ${FUNCTION_NAME}"
 
 mkdir -p "${BUILD_DIR}"
 
 ACCOUNT_ID="$("${AWS_CMD[@]}" sts get-caller-identity --query Account --output text)"
-ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${ROLE_NAME}"
+if [[ -z "${ROLE_ARN}" ]]; then
+  ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${ROLE_NAME}"
+fi
 
-if ! "${AWS_CMD[@]}" iam get-role --role-name "${ROLE_NAME}" >/dev/null 2>&1; then
+if [[ "${DEPLOY_MODE}" == "full" ]] && ! "${AWS_CMD[@]}" iam get-role --role-name "${ROLE_NAME}" >/dev/null 2>&1; then
   cat > "${TRUST_POLICY_PATH}" <<EOF
 {
   "Version": "2012-10-17",
@@ -68,7 +82,9 @@ EOF
   # IAM propagation.
   sleep 10
 else
-  echo "IAM role ${ROLE_NAME} already exists."
+  if [[ "${DEPLOY_MODE}" == "full" ]]; then
+    echo "IAM role ${ROLE_NAME} already exists."
+  fi
 fi
 
 echo "Building Lambda bootstrap..."
@@ -80,6 +96,7 @@ echo "Building Lambda bootstrap..."
 echo "Packaging function.zip..."
 (
   cd "${BUILD_DIR}"
+  rm -f "${ZIP_PATH}"
   zip -q -j "${ZIP_PATH}" bootstrap
 )
 
@@ -89,15 +106,23 @@ if "${AWS_CMD[@]}" lambda get-function --function-name "${FUNCTION_NAME}" >/dev/
     --function-name "${FUNCTION_NAME}" \
     --zip-file "fileb://${ZIP_PATH}" >/dev/null
 
-  "${AWS_CMD[@]}" lambda update-function-configuration \
-    --function-name "${FUNCTION_NAME}" \
-    --role "${ROLE_ARN}" \
-    --runtime "${RUNTIME}" \
-    --handler bootstrap \
-    --memory-size "${MEMORY_SIZE}" \
-    --timeout "${TIMEOUT}" \
-    --architectures "${ARCH}" >/dev/null
+  if [[ "${DEPLOY_MODE}" == "full" ]]; then
+    "${AWS_CMD[@]}" lambda update-function-configuration \
+      --function-name "${FUNCTION_NAME}" \
+      --role "${ROLE_ARN}" \
+      --runtime "${RUNTIME}" \
+      --handler bootstrap \
+      --memory-size "${MEMORY_SIZE}" \
+      --timeout "${TIMEOUT}" \
+      --architectures "${ARCH}" >/dev/null
+  fi
 else
+  if [[ "${DEPLOY_MODE}" == "update-only" ]]; then
+    echo "Lambda function ${FUNCTION_NAME} does not exist and DEPLOY_MODE=update-only."
+    echo "Create it once with DEPLOY_MODE=full, then use update-only in CI."
+    exit 1
+  fi
+
   echo "Creating Lambda function..."
   "${AWS_CMD[@]}" lambda create-function \
     --function-name "${FUNCTION_NAME}" \
