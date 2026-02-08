@@ -65,6 +65,9 @@ make format  # применить gofmt -w ко всем .go файлам
 make lint    # go vet ./...
 make test    # go test ./...
 make build   # сборка в bin/microservice
+make lambda-build   # сборка bootstrap для AWS Lambda
+make lambda-package # упаковка .build/lambda/function.zip
+make deploy-lambda  # деплой в AWS Lambda + Function URL
 make run     # запуск сервиса
 make ci      # fmt + lint + test + build
 ```
@@ -109,3 +112,36 @@ make ci      # fmt + lint + test + build
 1. Добавить Dockerfile и публикацию образа.
 2. Добавить `deploy.yml` (staging/prod) с environment approvals.
 3. Подключить AWS (ECR/ECS/EKS) после того, как будут входные данные по инфраструктуре.
+
+## Деплой в AWS Lambda (serverless URL)
+
+Текущий вариант без кастомного домена: `Lambda Function URL`.
+После деплоя получаешь URL вида:
+
+`https://<id>.lambda-url.<region>.on.aws`
+
+### Быстрый деплой
+
+```bash
+AWS_PROFILE=terraform_login AWS_REGION=eu-north-1 make deploy-lambda
+```
+
+Скрипт `scripts/deploy_lambda.sh`:
+1. Создает/переиспользует IAM роль `${FUNCTION_NAME}-exec-role`.
+2. Собирает `bootstrap` из `cmd/lambda`.
+3. Создает или обновляет Lambda функцию.
+4. Создает или обновляет `Function URL` с `AuthType=NONE`.
+5. Добавляет публичные permissions для вызова через URL.
+6. Печатает итоговый URL функции.
+
+### Переменные (опционально)
+
+```bash
+FUNCTION_NAME=cicd-microservice
+ROLE_NAME=cicd-microservice-exec-role
+AWS_REGION=eu-north-1
+AWS_PROFILE=terraform_login
+ARCH=arm64
+MEMORY_SIZE=256
+TIMEOUT=10
+```
