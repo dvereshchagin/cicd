@@ -44,7 +44,6 @@ jobs:
       - name: Deploy to Lambda
         run: |
           DEPLOY_MODE=update-only \
-          AWS_PROFILE= \
           AWS_REGION="${AWS_REGION}" \
           FUNCTION_NAME="${FUNCTION_NAME}" \
           ./scripts/deploy_lambda.sh

@@ -8,7 +8,7 @@ ZIP_PATH="${BUILD_DIR}/function.zip"
 TRUST_POLICY_PATH="${BUILD_DIR}/trust-policy.json"
 
 AWS_REGION="${AWS_REGION:-eu-north-1}"
-AWS_PROFILE="${AWS_PROFILE:-}"
+PROFILE_NAME="${AWS_PROFILE:-}"
 FUNCTION_NAME="${FUNCTION_NAME:-cicd-microservice}"
 ROLE_NAME="${ROLE_NAME:-${FUNCTION_NAME}-exec-role}"
 ROLE_ARN="${ROLE_ARN:-}"
@@ -33,14 +33,19 @@ if ! command -v zip >/dev/null 2>&1; then
   exit 1
 fi
 
+# An explicitly empty AWS_PROFILE/AWS_DEFAULT_PROFILE breaks AWS CLI with profile "".
+if [[ -z "${PROFILE_NAME}" ]]; then
+  unset AWS_PROFILE AWS_DEFAULT_PROFILE || true
+fi
+
 AWS_CMD=(aws --region "${AWS_REGION}")
-if [[ -n "${AWS_PROFILE}" ]]; then
-  AWS_CMD+=(--profile "${AWS_PROFILE}")
+if [[ -n "${PROFILE_NAME}" ]]; then
+  AWS_CMD+=(--profile "${PROFILE_NAME}")
 fi
 
 echo "Using AWS region: ${AWS_REGION}"
-if [[ -n "${AWS_PROFILE}" ]]; then
-  echo "Using AWS profile: ${AWS_PROFILE}"
+if [[ -n "${PROFILE_NAME}" ]]; then
+  echo "Using AWS profile: ${PROFILE_NAME}"
 else
   echo "Using AWS profile: default credential chain"
 fi
