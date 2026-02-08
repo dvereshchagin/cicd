@@ -15,8 +15,15 @@ var homeHTML []byte
 type apiResponse struct {
 	Status  string `json:"status,omitempty"`
 	Message string `json:"message,omitempty"`
+	Feature string `json:"feature,omitempty"`
+	Version string `json:"version,omitempty"`
 	Time    string `json:"time,omitempty"`
 }
+
+const (
+	defaultAppVersion = "local-dev"
+	featureProbeName  = "probe"
+)
 
 func main() {
 	port := os.Getenv("PORT")
@@ -28,6 +35,7 @@ func main() {
 	mux.HandleFunc("/", homeHandler)
 	mux.HandleFunc("/healthz", healthzHandler)
 	mux.HandleFunc("/hello", helloHandler)
+	mux.HandleFunc("/feature-probe", featureProbeHandler)
 
 	server := &http.Server{
 		Addr:              ":" + port,
@@ -85,6 +93,27 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, apiResponse{
 		Message: "hello, " + name,
 	})
+}
+
+func featureProbeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, apiResponse{
+		Status:  "ok",
+		Feature: featureProbeName,
+		Version: currentAppVersion(),
+	})
+}
+
+func currentAppVersion() string {
+	version := os.Getenv("APP_VERSION")
+	if version == "" {
+		return defaultAppVersion
+	}
+	return version
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, response any) {

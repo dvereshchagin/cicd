@@ -115,3 +115,53 @@ func TestHandleMethodNotAllowed(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusMethodNotAllowed, res.StatusCode)
 	}
 }
+
+func TestHandleFeatureProbe(t *testing.T) {
+	res, err := handle(context.Background(), events.LambdaFunctionURLRequest{
+		RawPath: "/feature-probe",
+		RequestContext: events.LambdaFunctionURLRequestContext{
+			HTTP: events.LambdaFunctionURLRequestContextHTTPDescription{
+				Method: http.MethodGet,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, res.StatusCode)
+	}
+
+	if !strings.Contains(res.Body, "\"status\":\"ok\"") {
+		t.Fatalf("expected probe status, got %q", res.Body)
+	}
+
+	if !strings.Contains(res.Body, "\"feature\":\""+featureProbeName+"\"") {
+		t.Fatalf("expected probe feature name, got %q", res.Body)
+	}
+
+	if !strings.Contains(res.Body, "\"version\":\""+defaultAppVersion+"\"") {
+		t.Fatalf("expected default app version, got %q", res.Body)
+	}
+}
+
+func TestHandleFeatureProbeVersionFromEnv(t *testing.T) {
+	t.Setenv("APP_VERSION", "sha-test")
+
+	res, err := handle(context.Background(), events.LambdaFunctionURLRequest{
+		RawPath: "/feature-probe",
+		RequestContext: events.LambdaFunctionURLRequestContext{
+			HTTP: events.LambdaFunctionURLRequestContextHTTPDescription{
+				Method: http.MethodGet,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(res.Body, "\"version\":\"sha-test\"") {
+		t.Fatalf("expected version from env, got %q", res.Body)
+	}
+}

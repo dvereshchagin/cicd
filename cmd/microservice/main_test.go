@@ -117,3 +117,49 @@ func TestMethodNotAllowed(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusMethodNotAllowed, rec.Code)
 	}
 }
+
+func TestFeatureProbeHandlerDefaultVersion(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/feature-probe", nil)
+	rec := httptest.NewRecorder()
+
+	featureProbeHandler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	var payload apiResponse
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if payload.Status != "ok" {
+		t.Fatalf("expected status %q, got %q", "ok", payload.Status)
+	}
+
+	if payload.Feature != featureProbeName {
+		t.Fatalf("expected feature %q, got %q", featureProbeName, payload.Feature)
+	}
+
+	if payload.Version != defaultAppVersion {
+		t.Fatalf("expected version %q, got %q", defaultAppVersion, payload.Version)
+	}
+}
+
+func TestFeatureProbeHandlerFromEnv(t *testing.T) {
+	t.Setenv("APP_VERSION", "sha-test")
+
+	req := httptest.NewRequest(http.MethodGet, "/feature-probe", nil)
+	rec := httptest.NewRecorder()
+
+	featureProbeHandler(rec, req)
+
+	var payload apiResponse
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if payload.Version != "sha-test" {
+		t.Fatalf("expected version %q, got %q", "sha-test", payload.Version)
+	}
+}

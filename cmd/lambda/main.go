@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -19,8 +20,15 @@ var homeHTML string
 type apiResponse struct {
 	Status  string `json:"status,omitempty"`
 	Message string `json:"message,omitempty"`
+	Feature string `json:"feature,omitempty"`
+	Version string `json:"version,omitempty"`
 	Time    string `json:"time,omitempty"`
 }
+
+const (
+	defaultAppVersion = "local-dev"
+	featureProbeName  = "probe"
+)
 
 func main() {
 	lambda.Start(handle)
@@ -83,9 +91,32 @@ func handle(_ context.Context, req events.LambdaFunctionURLRequest) (events.Lamb
 		}
 
 		return jsonResponse(http.StatusOK, string(body)), nil
+	case "/feature-probe":
+		if method != http.MethodGet {
+			return textResponse(http.StatusMethodNotAllowed, "method not allowed"), nil
+		}
+
+		body, err := json.Marshal(apiResponse{
+			Status:  "ok",
+			Feature: featureProbeName,
+			Version: currentAppVersion(),
+		})
+		if err != nil {
+			return textResponse(http.StatusInternalServerError, "encoding error"), nil
+		}
+
+		return jsonResponse(http.StatusOK, string(body)), nil
 	default:
 		return textResponse(http.StatusNotFound, "not found"), nil
 	}
+}
+
+func currentAppVersion() string {
+	version := os.Getenv("APP_VERSION")
+	if version == "" {
+		return defaultAppVersion
+	}
+	return version
 }
 
 func jsonResponse(statusCode int, body string) events.LambdaFunctionURLResponse {

@@ -46,6 +46,7 @@ jobs:
           DEPLOY_MODE=update-only \
           AWS_REGION="${AWS_REGION}" \
           FUNCTION_NAME="${FUNCTION_NAME}" \
+          APP_VERSION="${GITHUB_SHA}" \
           ./scripts/deploy_lambda.sh
 
       - name: Get Function URL
@@ -59,3 +60,20 @@ jobs:
         run: |
           curl -fsS "${{ steps.function-url.outputs.url }}healthz"
           curl -fsS "${{ steps.function-url.outputs.url }}hello?name=github-actions"
+          probe_response="$(curl -fsS "${{ steps.function-url.outputs.url }}feature-probe")"
+          echo "feature-probe: ${probe_response}"
+          probe_status="$(echo "${probe_response}" | jq -r '.status')"
+          probe_feature="$(echo "${probe_response}" | jq -r '.feature')"
+          probe_version="$(echo "${probe_response}" | jq -r '.version')"
+          if [ "${probe_status}" != "ok" ]; then
+            echo "feature-probe status mismatch: expected ok, got ${probe_status}"
+            exit 1
+          fi
+          if [ "${probe_feature}" != "probe" ]; then
+            echo "feature-probe feature mismatch: expected probe, got ${probe_feature}"
+            exit 1
+          fi
+          if [ "${probe_version}" != "${GITHUB_SHA}" ]; then
+            echo "feature-probe version mismatch: expected ${GITHUB_SHA}, got ${probe_version}"
+            exit 1
+          fi

@@ -9,6 +9,7 @@
 - `GET /` - простая веб-страница для smoke-check ручек.
 - `GET /healthz` - проверка, что сервис жив.
 - `GET /hello?name=dev` - простой ответ `hello`.
+- `GET /feature-probe` - проверка версии деплоя (`APP_VERSION`).
 3. В CI запускаются 4 независимые проверки:
 - `fmt` (форматирование Go-кода),
 - `lint` (`go vet`),
@@ -43,6 +44,7 @@ open http://localhost:8080/
 curl http://localhost:8080/healthz
 curl "http://localhost:8080/hello?name=Dave"
 curl http://localhost:8080/hello
+curl http://localhost:8080/feature-probe
 ```
 
 Пример ответа `/healthz`:
@@ -55,6 +57,12 @@ curl http://localhost:8080/hello
 
 ```json
 {"message":"hello, Dave"}
+```
+
+Пример ответа `/feature-probe`:
+
+```json
+{"status":"ok","feature":"probe","version":"local-dev"}
 ```
 
 ## Команды Makefile
@@ -144,6 +152,7 @@ AWS_PROFILE=terraform_login
 ARCH=arm64
 MEMORY_SIZE=256
 TIMEOUT=10
+APP_VERSION=local-dev
 ```
 
 ### CD из GitHub Actions в Lambda
@@ -157,8 +166,9 @@ TIMEOUT=10
 Что делает workflow:
 1. Запускает `make ci`.
 2. Получает AWS credentials через OIDC (`aws-actions/configure-aws-credentials`).
-3. Выполняет деплой в режиме `DEPLOY_MODE=update-only`.
-4. Дергает smoke checks через Function URL.
+3. Выполняет деплой в режиме `DEPLOY_MODE=update-only` и передает `APP_VERSION=${GITHUB_SHA}`.
+4. Дергает smoke checks через Function URL (`/healthz`, `/hello`, `/feature-probe`).
+5. Проверяет, что `feature-probe.version == GITHUB_SHA` (подтверждение, что задеплоился именно текущий коммит).
 
 Используемая IAM роль для OIDC:
 - `arn:aws:iam::729665432048:role/github-actions-cicd-deploy-role`

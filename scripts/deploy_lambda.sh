@@ -17,6 +17,7 @@ ARCH="${ARCH:-arm64}"
 MEMORY_SIZE="${MEMORY_SIZE:-256}"
 TIMEOUT="${TIMEOUT:-10}"
 DEPLOY_MODE="${DEPLOY_MODE:-full}"
+APP_VERSION="${APP_VERSION:-local-dev}"
 
 if [[ "${DEPLOY_MODE}" != "full" && "${DEPLOY_MODE}" != "update-only" ]]; then
   echo "DEPLOY_MODE must be 'full' or 'update-only'"
@@ -51,6 +52,7 @@ else
 fi
 echo "Deploy mode: ${DEPLOY_MODE}"
 echo "Function name: ${FUNCTION_NAME}"
+echo "App version: ${APP_VERSION}"
 
 mkdir -p "${BUILD_DIR}"
 
@@ -119,7 +121,12 @@ if "${AWS_CMD[@]}" lambda get-function --function-name "${FUNCTION_NAME}" >/dev/
       --handler bootstrap \
       --memory-size "${MEMORY_SIZE}" \
       --timeout "${TIMEOUT}" \
-      --architectures "${ARCH}" >/dev/null
+      --architectures "${ARCH}" \
+      --environment "Variables={APP_VERSION=${APP_VERSION}}" >/dev/null
+  else
+    "${AWS_CMD[@]}" lambda update-function-configuration \
+      --function-name "${FUNCTION_NAME}" \
+      --environment "Variables={APP_VERSION=${APP_VERSION}}" >/dev/null
   fi
 else
   if [[ "${DEPLOY_MODE}" == "update-only" ]]; then
@@ -137,6 +144,7 @@ else
     --memory-size "${MEMORY_SIZE}" \
     --timeout "${TIMEOUT}" \
     --architectures "${ARCH}" \
+    --environment "Variables={APP_VERSION=${APP_VERSION}}" \
     --zip-file "fileb://${ZIP_PATH}" >/dev/null
 fi
 
