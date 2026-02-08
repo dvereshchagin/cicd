@@ -5,7 +5,8 @@
 ## Что здесь происходит
 
 1. Приложение поднимает HTTP-сервер на порту `8080` (или на `PORT`, если переменная окружения задана).
-2. Есть два endpoint'а:
+2. Есть базовый UI и API endpoint'ы:
+- `GET /` - простая веб-страница для smoke-check ручек.
 - `GET /healthz` - проверка, что сервис жив.
 - `GET /hello?name=dev` - простой ответ `hello`.
 3. В CI запускаются 4 независимые проверки:
@@ -38,6 +39,7 @@ make run
 Проверка:
 
 ```bash
+open http://localhost:8080/
 curl http://localhost:8080/healthz
 curl "http://localhost:8080/hello?name=Dave"
 curl http://localhost:8080/hello

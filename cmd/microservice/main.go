@@ -1,12 +1,16 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"time"
 )
+
+//go:embed home.html
+var homeHTML []byte
 
 type apiResponse struct {
 	Status  string `json:"status,omitempty"`
@@ -21,6 +25,7 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/", homeHandler)
 	mux.HandleFunc("/healthz", healthzHandler)
 	mux.HandleFunc("/hello", helloHandler)
 
@@ -33,6 +38,24 @@ func main() {
 	log.Printf("microservice is listening on :%s", port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server failed: %v", err)
+	}
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(homeHTML); err != nil {
+		log.Printf("failed to write home page: %v", err)
 	}
 }
 
